@@ -1,10 +1,10 @@
-SNAKES = { 16 => 6, 46 => 25, 49 => 11, 62 => 19, 64 => 60, 74 => 53, 89 => 68, 92 => 88, 95 => 75, 99 => 80 }
-LADDERS = { 2 => 38, 7 => 14, 8 => 31, 15 => 26, 21 => 42, 28 => 84, 36 => 44, 51 => 67, 71 => 91, 78 => 98, 87 => 94 }
+require './config'
+SNAKES = Config::SNAKES
+LADDERS = Config::LADDERS
+GAME_CONSTANTS = Config::GAME_CONSTANTS
 
 class SnakesLadders  
-	attr_accessor :player_turn
-	attr_accessor :player_place
-    attr_accessor :game_over
+	attr_accessor :player_turn, :player_place, :game_over
 
 	def initialize()
   		reset()
@@ -18,18 +18,18 @@ class SnakesLadders
         destinations = []
         message = ""
     	if game_over
-    		return [-1, -1, "Game over!"]
-    	elsif new_pos == 100
+    		return [-1, -1, GAME_CONSTANTS[:game_over_message]]
+    	elsif new_pos == GAME_CONSTANTS[:square_num]
     		self.game_over = true
-            message = "Player #{player_turn + 1} Wins!"
-            destinations = [100]
-    	elsif new_pos > 100
-            destinations = [ 200 - new_pos, 100 ]
+            message = eval("\"" + GAME_CONSTANTS[:win_message] + "\"")
+            destinations = [GAME_CONSTANTS[:square_num]]
+    	elsif new_pos > GAME_CONSTANTS[:square_num]
+            destinations = [ GAME_CONSTANTS[:square_num] * 2 - new_pos, GAME_CONSTANTS[:square_num] ]
         else
             destinations = [new_pos]
     	end
 
-        # need to turn corners
+        # turning corners
         if (current_pos - 1).floor(-1) + 20 == (destinations.first - 1).floor(-1)
             destinations.push((current_pos - 1).floor(-1) + 21)
             destinations.push((current_pos - 1).floor(-1) + 20)
@@ -44,15 +44,15 @@ class SnakesLadders
 
         # check snakes or ladders
     	if SNAKES.key?(destinations.first)
-    		message += "Oh no, a snake. "
+    		message += GAME_CONSTANTS[:snake_message]
     		destinations.unshift(SNAKES[destinations.first])
     	elsif LADDERS.key?(destinations.first)
-    		message +=  "Yes, a ladder! "
+    		message += GAME_CONSTANTS[:ladder_message]
             destinations.unshift(LADDERS[destinations.first])
     	end
 
         self.player_place[player_turn] = destinations.first
-        message += "Player #{player_turn + 1} is on square #{destinations.first}" if not game_over
+        message += eval("\"" + GAME_CONSTANTS[:turn_message] + "\"") if not game_over
     	result = [ player_turn, destinations, message ]
 
     	#next player's turn unless rolled doubles

@@ -1,112 +1,131 @@
+require './config'
+BOARD_CONFIG = Config::BOARD_CONFIG
+
 class Counter < Circle
- 	attr_accessor :moving, :speed, :last_pos_x, :last_pos_y, :new_pos_x, :new_pos_y, :destinations
+ 	attr_accessor :destinations, :last_pos_x, :last_pos_y, :moving, :new_pos_x, :new_pos_y, :speed
 end
 
 class GameBoard
-  	attr_reader :width, :height, :border, :board_border, :board_border_colour, :image_border, :square_width, :square_height
-  	attr_reader :players
-  	attr_accessor :buttons, :button_gap, :counters, :player_colours, :labels
-  	attr_accessor :message, :moving_counters
+  	attr_accessor :buttons, :counters, :labels, :message, :moving_counters, :players, :square_height, :square_width
 
 	def initialize(players)
-		@border = 50
-		@board_border = 5
-		@board_border_colour = 'black'
-		@width = 700
-		@height = 700
-		@button_gap = 5
 		Image.new(
-			'snakesandladdersboard.jpg',
-			x: border, y: border,
-			width: width, height: width,
-			colour: [1.0, 1.0, 1.0, 1.0],
-			z: 100
+			BOARD_CONFIG[:image],
+			x: BOARD_CONFIG[:border],
+			y: BOARD_CONFIG[:border],
+			width: BOARD_CONFIG[:width],
+			height: BOARD_CONFIG[:height],
+			z: BOARD_CONFIG[:z_image]
 			)
-		@image_border = 4
-		@square_width = (width - 2 * image_border) / 10
-		@square_height = (height - 2 * image_border) / 10
+		self.square_width = (BOARD_CONFIG[:width] - 2 * BOARD_CONFIG[:image_border]) / BOARD_CONFIG[:sq_across]
+		self.square_height = (BOARD_CONFIG[:height] - 2 * BOARD_CONFIG[:image_border]) / BOARD_CONFIG[:sq_down]
 
 		make_border()
 
 		#add buttons and labels
-		@buttons = []
-		@labels = []
-		add_button("New Game")
-		add_button("Go")
-		add_button("Dice")
+		self.buttons = []
+		self.labels = []
 
-		@players = players
-		@counters = []
-		@player_colours = ['black', 'green']
-		max_players = 2
-		raise GameBoardError, "Too many players.  Maximum is #{max_players}" if players > max_players
+		add_button("New Game", BOARD_CONFIG[:button_colour])
+		add_button("Go", BOARD_CONFIG[:button_colour])
+		add_button("Quit", BOARD_CONFIG[:button_colour])
+		add_button("Dice", BOARD_CONFIG[:info_colour])
+
+		self.players = players	
+		raise GameBoardError, "Too many players.  Maximum is #{BOARD_CONFIG[:max_players]}" if players > BOARD_CONFIG[:max_players]
 		raise GameBoardError, "Can't have less than 0 players" if players < 0
+
+		self.counters = []
 		players.times { |p| add_counter(p) }
-		
 		self.moving_counters = false
+
+		# start new game
+		reset()
 	end
 
-	def add_button(text)
+	def add_button(text, colour)
 		# add button
-		buttons << Rectangle.new(
-			x: border + buttons.size * (width / 5 + button_gap),
-			y: height + border + board_border + button_gap,
-			width: width / 5,
-			height: height / 20,
-			color: 'yellow'
+		self.buttons << Rectangle.new(
+			x: BOARD_CONFIG[:border] + buttons.size * (BOARD_CONFIG[:width] / BOARD_CONFIG[:buttons_across] + BOARD_CONFIG[:button_gap]),
+			y: BOARD_CONFIG[:height] + BOARD_CONFIG[:border] + BOARD_CONFIG[:board_border] + BOARD_CONFIG[:button_gap],
+			width: BOARD_CONFIG[:width] / BOARD_CONFIG[:buttons_across],
+			height: BOARD_CONFIG[:height] / BOARD_CONFIG[:buttons_down],
+			color: colour,
+			z: BOARD_CONFIG[:z_button]
 			)
-		labels << Text.new(
+		#add button border
+		Rectangle.new(
+			x: buttons[-1].x - BOARD_CONFIG[:button_border_size],
+			y: buttons[-1].y - BOARD_CONFIG[:button_border_size],
+			width: buttons[-1].width + 2 * BOARD_CONFIG[:button_border_size],
+			height: buttons[-1].height + 2 * BOARD_CONFIG[:button_border_size],
+			color: BOARD_CONFIG[:button_border_colour],
+			z: BOARD_CONFIG[:z_button_border]
+			)
+		self.labels << Text.new(
 			text,
-			x: @buttons[-1].x + @buttons[-1].width / 8,
-			y: @buttons[-1].y + @buttons[-1].height / 4,
-			size: @buttons[-1].height / 2,
-			color: 'black'
+			x: @buttons[-1].x + @buttons[-1].width * BOARD_CONFIG[:label_x_adjust],
+			y: @buttons[-1].y + @buttons[-1].height * BOARD_CONFIG[:label_y_adjust],
+			size: @buttons[-1].height * BOARD_CONFIG[:label_size],
+			color: BOARD_CONFIG[:label_text_colour],
+			z: BOARD_CONFIG[:z_label]
 			)
 	end
 
 	def add_counter(player)
 		counters << Counter.new(
-  			radius: 12,
-  			sectors: 5,
-  			color: player_colours[player],
-  			z: 200
+  			radius: BOARD_CONFIG[:counter_radius],
+  			sectors: BOARD_CONFIG[:counter_sectors],
+  			color: BOARD_CONFIG[:player_colours][player],
+  			z: BOARD_CONFIG[:z_counter]
 			)
 		self.counters[-1].moving = 0
 		self.counters[-1].destinations = []
 	end
 
 	def board_position(player, pos)
+		counter_adjust_x = (player + 1) * square_width / 3
+		counter_adjust_y = (player + 1) * square_height / 3
 		if pos == 0
-			[ board_space_position_x(1) - (player + 1) * square_width / 3, board_space_position_y(1) - (player + 1) * square_height / 3 ]
+			[ board_space_position_x(1) - counter_adjust_x, board_space_position_y(1) - counter_adjust_y ]
 		else
-			[ board_space_position_x(pos) + (player + 1) * square_width / 3, board_space_position_y(pos) - (player + 1) * square_height / 3 ]
+			[ board_space_position_x(pos) + counter_adjust_x, board_space_position_y(pos) - counter_adjust_y ]
 		end
 	end
 
 	def board_space_position_x(board_space)
+			# right to left squares direction
 		if (board_space - 1) % 20 == (board_space - 1) % 10
-			border + image_border + (board_space - 1) % 10 * square_width
+			BOARD_CONFIG[:border] + BOARD_CONFIG[:image_border] + (board_space - 1) % 10 * square_width
+			# left to right squares direction
 		else
-			border + width - image_border - (board_space % 10 == 0 ? 10 : board_space % 10) * square_width
+			BOARD_CONFIG[:border] + BOARD_CONFIG[:width] - BOARD_CONFIG[:image_border] - (board_space % 10 == 0 ? 10 : board_space % 10) * square_width
 		end
 	end
 
 	def board_space_position_y(board_space)
-		border + height - image_border - (board_space - 1) / 10 * square_height
+		BOARD_CONFIG[:border] + BOARD_CONFIG[:height] - BOARD_CONFIG[:image_border] - (board_space - 1) / 10 * square_height
 	end
 
 	def change_message(new_message)
 		self.message.remove if not message.nil?
-		self.message = Text.new(new_message, x: 200, y: 20)
+		self.message = Text.new(
+			new_message,
+			x: BOARD_CONFIG[:message_x],
+			y: BOARD_CONFIG[:message_y],
+			color: BOARD_CONFIG[:message_colour],
+			z: BOARD_CONFIG[:z_message]
+		)
 	end
 
 	def make_border()
 		Rectangle.new(
-			x: border - board_border, y: border - board_border,
-			width: width + board_border * 2,
-			height: height + board_border * 2,
-			color: board_border_colour,
-			z: 1
+			x: BOARD_CONFIG[:border] - BOARD_CONFIG[:board_border],
+			y: BOARD_CONFIG[:border] - BOARD_CONFIG[:board_border],
+			width: BOARD_CONFIG[:width] + BOARD_CONFIG[:board_border] * 2,
+			height: BOARD_CONFIG[:height] + BOARD_CONFIG[:board_border] * 2,
+			color: BOARD_CONFIG[:board_border_colour],
+			z: BOARD_CONFIG[:z_border]
 			)
 	end
 
@@ -114,7 +133,7 @@ class GameBoard
 		moving = false
 		(0..players - 1).each do |p|
 			if counters[p].moving > 0
-				counters[p].moving -= 5
+				counters[p].moving -= BOARD_CONFIG[:counter_speed]
 				counters[p].x = (counters[p].new_pos_x * (counters[p].speed - counters[p].moving) + counters[p].last_pos_x * counters[p].moving) / counters[p].speed
 				counters[p].y = (counters[p].new_pos_y * (counters[p].speed - counters[p].moving) + counters[p].last_pos_y * counters[p].moving) / counters[p].speed
 				moving = true
@@ -122,10 +141,11 @@ class GameBoard
 				set_new_counter_position(p, counters[p].destinations.pop)
 				moving = true
 			end
-			if not moving
-				self.moving_counters = false
- 				self.buttons[1].color = 'yellow'
-			end
+		end
+		if not moving
+			self.moving_counters = false
+			self.buttons[0].color = BOARD_CONFIG[:button_colour]
+			self.buttons[1].color = BOARD_CONFIG[:button_colour]
 		end
 	end
 
@@ -155,7 +175,7 @@ class GameBoard
 	end
 
 	def show_dice(a)
-		labels[2].text = "Rolled: #{a.join(", ")}"
+		labels[3].text = "Rolled: #{a.join(", ")}"
 	end
 
 	def update_turn(dice, player, position, message)
@@ -163,6 +183,7 @@ class GameBoard
  		change_message(message)
  		self.counters[player].destinations = position
  		self.moving_counters = true
- 		self.buttons[1].color = 'black'
+ 		self.buttons[0].color = BOARD_CONFIG[:label_text_colour]
+ 		self.buttons[1].color = BOARD_CONFIG[:label_text_colour]
 	end
 end

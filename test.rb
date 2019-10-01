@@ -1,7 +1,8 @@
 
 
 class Testgame
-	def runtests
+	def runtests(gameboard)
+		# game engine tests
 		testgame = SnakesLadders.new
 		assert_equal testgame.player_place[0], 0, "start position should be 0"
 		assert_equal testgame.game_over, false, "should not be game over"
@@ -45,5 +46,11 @@ class Testgame
 		assert_equal testgame.game_over, true, "should be game over after win"
 		assert_equal turn[1].first, 100, "should state player at position 100"
 		assert_equal turn[2], "Player 1 Wins!", "should have win message"
+
+		# interface tests
+		assert_equal gameboard.players, 2, "should be 2 players"
+		assert_equal gameboard.buttons.length, 4, "should be 4 buttons"
+		assert_equal gameboard.labels.length, 4, "should be 4 labels"
+		assert_equal gameboard.counters.length, 2, "should be no counters"
 	end
 end
