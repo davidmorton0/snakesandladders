@@ -10,32 +10,65 @@ class SnakesLadders
   		reset()
 	end
 
+    # does a turn - returns [ player turn, destinations, message ]
 	def play(dice)
-    	@player_place[@player_turn] += dice.sum
+        current_pos = player_place[player_turn]
+    	new_pos = dice.sum + player_place[player_turn]
+
+        destinations = []
         message = ""
-    	if @game_over
+    	if game_over
     		return [-1, -1, "Game over!"]
-    	elsif @player_place[@player_turn] == 100
-    		@game_over = true
-    		return [ @player_turn, 100, "Player #{@player_turn + 1} Wins!"]
-    	elsif @player_place[@player_turn] > 100
-    		@player_place[@player_turn] = 200 - @player_place[@player_turn]
+    	elsif new_pos == 100
+    		self.game_over = true
+            message = "Player #{player_turn + 1} Wins!"
+            destinations = [100]
+    	elsif new_pos > 100
+            destinations = [ 200 - new_pos, 100 ]
+        else
+            destinations = [new_pos]
     	end
-    	if SNAKES.key?(@player_place[@player_turn])
-    		message = "Oh no, a snake. "
-    		@player_place[@player_turn] = SNAKES[@player_place[@player_turn]]
-    	elsif LADDERS.key?(@player_place[@player_turn])
-    		message =  "Yes, a ladder!. "
-    		@player_place[@player_turn] = LADDERS[@player_place[@player_turn]]
+
+        # need to turn corners
+        if (current_pos - 1).floor(-1) + 20 == (destinations.first - 1).floor(-1)
+            destinations.push((current_pos - 1).floor(-1) + 21)
+            destinations.push((current_pos - 1).floor(-1) + 20)
+            destinations.push((current_pos - 1).floor(-1) + 11)
+            destinations.push((current_pos - 1).floor(-1) + 10)
+        elsif (current_pos - 1).floor(-1) + 10 == (destinations.first - 1).floor(-1)
+            destinations.push((current_pos - 1).floor(-1) + 11)
+            destinations.push((current_pos - 1).floor(-1) + 10)
+        elsif (current_pos - 1).floor(-1) - 10 == (destinations.first - 1).floor(-1)
+            destinations.insert(1, 90, 91)
+        end
+
+        # check snakes or ladders
+    	if SNAKES.key?(destinations.first)
+    		message += "Oh no, a snake. "
+    		destinations.unshift(SNAKES[destinations.first])
+    	elsif LADDERS.key?(destinations.first)
+    		message +=  "Yes, a ladder! "
+            destinations.unshift(LADDERS[destinations.first])
     	end
-    	result = [ @player_turn, @player_place[@player_turn], message + "Player #{@player_turn + 1} is on square #{@player_place[@player_turn]}"]
-    	@player_turn = (1 - @player_turn) if dice.uniq.length == 2
+
+        self.player_place[player_turn] = destinations.first
+        message += "Player #{player_turn + 1} is on square #{destinations.first}" if not game_over
+    	result = [ player_turn, destinations, message ]
+
+    	#next player's turn unless rolled doubles
+        self.player_turn = (1 - player_turn) if dice.uniq.length == 2
     	return result
   	end
 
     def reset()
-        @player_turn = 0
-        @player_place = [0, 0]
-        @game_over = false
+        self.player_turn = 0
+        self.player_place = [0, 0]
+        self.game_over = false
+    end
+
+    def set_state(turn, player_places, set_game_over)
+        self.player_turn = turn
+        (0..player_places.length - 1).each { |x| self.player_place[x] = player_places[x] }
+        self.game_over = set_game_over
     end
 end

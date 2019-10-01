@@ -1,28 +1,12 @@
 class Counter < Circle
- 	attr_accessor :moving, :last_pos_x, :last_pos_y, :new_pos_x, :new_pos_y	
+ 	attr_accessor :moving, :speed, :last_pos_x, :last_pos_y, :new_pos_x, :new_pos_y, :destinations
 end
-=begin
-  	def initialize()
-  		@last_pos_x = 0
-  		@last_pos_y = 0
-  		@new_pos_x = nil
-  		@new_pos_y = nil
-  		@moving = 0
-  	end
-=end
 
 class GameBoard
-  	attr_reader :border
-  	attr_reader :board_border
-  	attr_reader :board_border_colour
-  	attr_reader :width
-  	attr_reader :height
-  	attr_reader :buttons
-  	attr_reader :button_gap
-  	attr_reader :counters, :player_colours
-  	attr_reader :labels
-  	attr_reader :image_border
-  	attr_reader :square_width, :square_height
+  	attr_reader :width, :height, :border, :board_border, :board_border_colour, :image_border, :square_width, :square_height
+  	attr_reader :players
+  	attr_accessor :buttons, :button_gap, :counters, :player_colours, :labels
+  	attr_accessor :message, :moving_counters
 
 	def initialize(players)
 		@border = 50
@@ -30,11 +14,7 @@ class GameBoard
 		@board_border_colour = 'black'
 		@width = 700
 		@height = 700
-		@buttons = []
 		@button_gap = 5
-		@counters = []
-		@player_colours = ['black', 'green']
-		@labels = []
 		Image.new(
 			'snakesandladdersboard.jpg',
 			x: border, y: border,
@@ -45,33 +25,25 @@ class GameBoard
 		@image_border = 4
 		@square_width = (width - 2 * image_border) / 10
 		@square_height = (height - 2 * image_border) / 10
+
 		make_border()
+
+		#add buttons and labels
+		@buttons = []
+		@labels = []
 		add_button("New Game")
 		add_button("Go")
 		add_button("Dice")
+
+		@players = players
+		@counters = []
+		@player_colours = ['black', 'green']
+		max_players = 2
+		raise GameBoardError, "Too many players.  Maximum is #{max_players}" if players > max_players
+		raise GameBoardError, "Can't have less than 0 players" if players < 0
 		players.times { |p| add_counter(p) }
-	end
-
-	def board_space_position_x(board_space)
-		if (board_space - 1) % 20 == (board_space - 1) % 10
-			x = border + image_border + (board_space - 1) % 10 * square_width
-		else
-			x = border + width - image_border - (board_space % 10 == 0 ? 10 : board_space % 10) * square_width
-		end
-	end
-
-	def board_space_position_y(board_space)
-		y = border + height - image_border - (board_space - 1) / 10 * square_height
-	end
-
-	def make_border()
-		Rectangle.new(
-			x: border - board_border, y: border - board_border,
-			width: width + board_border * 2,
-			height: height + board_border * 2,
-			color: board_border_colour,
-			z: 1
-			)
+		
+		self.moving_counters = false
 	end
 
 	def add_button(text)
@@ -92,10 +64,6 @@ class GameBoard
 			)
 	end
 
-	def show_dice(a)
-		labels[2].text = "Rolled: #{a.join(", ")}"
-	end
-
 	def add_counter(player)
 		counters << Counter.new(
   			radius: 12,
@@ -103,36 +71,98 @@ class GameBoard
   			color: player_colours[player],
   			z: 200
 			)
-		update(counters.size - 1, 0)		
+		self.counters[-1].moving = 0
+		self.counters[-1].destinations = []
 	end
 
-	def update(player, pos)
-		labels[1].text = "Player #{2 - player}: Go"
+	def board_position(player, pos)
 		if pos == 0
-			counters[player].x = board_space_position_x(1) - (player + 1) * square_width / 3
-			counters[player].y = board_space_position_y(1) - (player + 1) * square_height / 3
+			[ board_space_position_x(1) - (player + 1) * square_width / 3, board_space_position_y(1) - (player + 1) * square_height / 3 ]
 		else
-			counters[player].x = board_space_position_x(pos) + (player + 1) * square_width / 3
-			counters[player].y = board_space_position_y(pos) - (player + 1) * square_height / 3
-=begin
-			counters[player].last_pos_x = counters[player].x
-			counters[player].last_pos_y = counters[player].y
-			counters[player].new_pos_x = board_space_position_x(pos) + (player + 1) * square_width / 3
-			counters[player].new_pos_y = board_space_position_y(pos) - (player + 1) * square_height / 3
-			counters[player].moving == 100
-=end
+			[ board_space_position_x(pos) + (player + 1) * square_width / 3, board_space_position_y(pos) - (player + 1) * square_height / 3 ]
 		end
+	end
+
+	def board_space_position_x(board_space)
+		if (board_space - 1) % 20 == (board_space - 1) % 10
+			border + image_border + (board_space - 1) % 10 * square_width
+		else
+			border + width - image_border - (board_space % 10 == 0 ? 10 : board_space % 10) * square_width
+		end
+	end
+
+	def board_space_position_y(board_space)
+		border + height - image_border - (board_space - 1) / 10 * square_height
+	end
+
+	def change_message(new_message)
+		self.message.remove if not message.nil?
+		self.message = Text.new(new_message, x: 200, y: 20)
+	end
+
+	def make_border()
+		Rectangle.new(
+			x: border - board_border, y: border - board_border,
+			width: width + board_border * 2,
+			height: height + board_border * 2,
+			color: board_border_colour,
+			z: 1
+			)
 	end
 
 	def move_counter(players)
+		moving = false
 		(0..players - 1).each do |p|
-			puts p
-			puts counters[p].x
 			if counters[p].moving > 0
-				counters[p].moving -= 1
-				counters[p].x = counters[p].new_pos_x - (counters[p].last_pos_x - counters[p].new_pos_x) * 100 / counters[p].moving
-				counters[p].y = counters[p].new_pos_y - (counters[p].last_pos_y - counters[p].new_pos_y) * 100 / counters[p].moving
+				counters[p].moving -= 5
+				counters[p].x = (counters[p].new_pos_x * (counters[p].speed - counters[p].moving) + counters[p].last_pos_x * counters[p].moving) / counters[p].speed
+				counters[p].y = (counters[p].new_pos_y * (counters[p].speed - counters[p].moving) + counters[p].last_pos_y * counters[p].moving) / counters[p].speed
+				moving = true
+			elsif counters[p].destinations.size > 0
+				set_new_counter_position(p, counters[p].destinations.pop)
+				moving = true
+			end
+			if not moving
+				self.moving_counters = false
+ 				self.buttons[1].color = 'yellow'
 			end
 		end
+	end
+
+	def reset()
+		(0..players - 1).each do |p|
+			set_counter_position(p, 0)
+		end
+		change_message("New Game")
+	end
+
+	def set_counter_position(player, pos)
+		counters[player].x, counters[player].y = board_position(player, pos)
+	end
+
+	def set_new_counter_position(player, pos)
+		counters[player].last_pos_x, counters[player].last_pos_y = counters[player].x, counters[player].y
+		counters[player].new_pos_x, counters[player].new_pos_y = board_position(player, pos)
+		counters[player].moving = Integer.sqrt((counters[player].new_pos_x - counters[player].last_pos_x) ** 2 + (counters[player].new_pos_y - counters[player].last_pos_y) ** 2)
+		counters[player].speed = counters[player].moving
+	end
+
+	def set_state(positions)
+		(0..players - 1).each do |p|
+			set_counter_position(p, positions[p])
+		end
+		change_message("Snakes & Ladders: Game Loaded")
+	end
+
+	def show_dice(a)
+		labels[2].text = "Rolled: #{a.join(", ")}"
+	end
+
+	def update_turn(dice, player, position, message)
+		show_dice(dice)
+ 		change_message(message)
+ 		self.counters[player].destinations = position
+ 		self.moving_counters = true
+ 		self.buttons[1].color = 'black'
 	end
 end
